@@ -27,15 +27,17 @@ export const monthKey = (iso) => iso.slice(0, 7);
 
 export function startOfMonthISO(iso) {
   const [y, m] = iso.split("-").map(Number);
-  const d = new Date(y, (m || 1) - 1, 1);
-  return d.toISOString().slice(0, 10);
+  // Use UTC to avoid timezone offsets pushing the date into the previous month
+  const d = new Date(Date.UTC(y, (m || 1) - 1, 1));
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 export function addMonths(iso, delta) {
   const [y, m] = iso.split("-").map(Number);
-  const d = new Date(y, (m || 1) - 1, 1);
-  d.setMonth(d.getMonth() + delta);
-  return d.toISOString().slice(0, 10);
+  // Work in UTC to avoid timezone offsets affecting the month rollovers
+  const d = new Date(Date.UTC(y, (m || 1) - 1, 1));
+  d.setUTCMonth(d.getUTCMonth() + delta);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 export function daysInMonth(iso) {

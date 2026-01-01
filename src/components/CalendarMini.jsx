@@ -12,6 +12,7 @@ export default function CalendarMini({ workoutsByDate, plansByDate }) {
   const first = useMemo(() => startOfMonthISO(cursor), [cursor]);
   const dim = useMemo(() => daysInMonth(first), [first]);
   const offset = useMemo(() => weekdayIndex(first), [first]);
+  const changeMonth = (delta) => setCursor((prev) => addMonths(startOfMonthISO(prev), delta));
 
   const days = useMemo(() => {
     const out = [];
@@ -38,10 +39,10 @@ export default function CalendarMini({ workoutsByDate, plansByDate }) {
             Calendar
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => setCursor(addMonths(first, -1))}>
+            <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => changeMonth(-1)}>
               Prev
             </Button>
-            <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => setCursor(addMonths(first, 1))}>
+            <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => changeMonth(1)}>
               Next
             </Button>
           </div>
