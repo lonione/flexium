@@ -27,15 +27,19 @@ export const monthKey = (iso) => iso.slice(0, 7);
 
 export function startOfMonthISO(iso) {
   const [y, m] = iso.split("-").map(Number);
-  const d = new Date(y, (m || 1) - 1, 1);
-  return d.toISOString().slice(0, 10);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return iso;
+  const year = y.toString().padStart(4, "0");
+  const month = m.toString().padStart(2, "0");
+  return `${year}-${month}-01`;
 }
 
 export function addMonths(iso, delta) {
   const [y, m] = iso.split("-").map(Number);
-  const d = new Date(y, (m || 1) - 1, 1);
-  d.setMonth(d.getMonth() + delta);
-  return d.toISOString().slice(0, 10);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return iso;
+  const base = y * 12 + (m - 1) + delta;
+  const year = Math.floor(base / 12);
+  const month = ((base % 12) + 12) % 12; // keep positive
+  return `${year.toString().padStart(4, "0")}-${(month + 1).toString().padStart(2, "0")}-01`;
 }
 
 export function daysInMonth(iso) {
