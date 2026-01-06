@@ -5,13 +5,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { addMonths, daysInMonth, startOfMonthISO, todayISO, weekdayIndex } from "@/lib/domain";
+import { daysInMonth, todayISO, weekdayIndex } from "@/lib/domain";
 
 export default function CalendarMini({ workoutsByDate, plansByDate }) {
-  const [cursor, setCursor] = useState(startOfMonthISO(todayISO()));
-  const first = useMemo(() => startOfMonthISO(cursor), [cursor]);
+  const initial = useMemo(() => {
+    const now = new Date();
+    return now.getFullYear() * 12 + now.getMonth(); // month index since year 0
+  }, []);
+  const [monthIndex, setMonthIndex] = useState(initial);
+
+  const first = useMemo(() => {
+    const year = Math.floor(monthIndex / 12);
+    const month = (monthIndex % 12) + 1;
+    return `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-01`;
+  }, [monthIndex]);
   const dim = useMemo(() => daysInMonth(first), [first]);
   const offset = useMemo(() => weekdayIndex(first), [first]);
+  const changeMonth = (delta) => setMonthIndex((prev) => prev + delta);
 
   const days = useMemo(() => {
     const out = [];
@@ -38,10 +48,10 @@ export default function CalendarMini({ workoutsByDate, plansByDate }) {
             Calendar
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => setCursor(addMonths(first, -1))}>
+            <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => changeMonth(-1)}>
               Prev
             </Button>
-            <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => setCursor(addMonths(first, 1))}>
+            <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => changeMonth(1)}>
               Next
             </Button>
           </div>
