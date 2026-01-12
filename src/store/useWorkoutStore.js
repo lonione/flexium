@@ -66,26 +66,39 @@ function mapMetricToDb(entry, userId) {
   return { id: entry.id, user_id: userId, date: entry.date, weight: entry.weight, body_fat: entry.bodyFat };
 }
 
+async function ensureAuthUser() {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Failed to read session", sessionError);
+  }
+  let user = sessionData?.session?.user || null;
+  if (!user) {
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) throw error;
+    user = data.user;
+  }
+  return user;
+}
+
 export function useWorkoutStore() {
   const [state, setState] = useState(() => emptyState);
 
   useEffect(() => {
     let active = true;
-
-    const loadForUser = async (user) => {
+    const load = async () => {
       try {
+        const user = await ensureAuthUser();
         if (!user) return;
 
         const { data: userRow } = await supabase.from("users").select("*").eq("id", user.id).maybeSingle();
         let resolvedUser = mapUserFromDb(userRow);
 
         if (!resolvedUser) {
-          const displayName = user.email ? user.email.split("@")[0] : "You";
           const { data: createdUser, error: createError } = await supabase
             .from("users")
             .insert({
               id: user.id,
-              name: displayName || "You",
+              name: "You",
               role: "trainee",
               favorites: [],
               settings: DEFAULT_SETTINGS
@@ -149,28 +162,9 @@ export function useWorkoutStore() {
       }
     };
 
-    const initialize = async () => {
-      const { data: sessionData, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error("Failed to read session", error);
-      }
-      if (sessionData?.session?.user) {
-        await loadForUser(sessionData.session.user);
-      }
-    };
-
-    initialize();
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      if (session?.user) {
-        loadForUser(session.user);
-      } else {
-        setState(emptyState);
-      }
-    });
+    load();
     return () => {
       active = false;
-      subscription?.subscription?.unsubscribe();
     };
   }, []);
 
