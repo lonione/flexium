@@ -49,7 +49,7 @@ export default function CalendarMini({ workoutsByDate, plansByDate }) {
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => changeMonth(-1)}>
-              Prvi
+              Prev
             </Button>
             <Button size="sm" variant="secondary" className="rounded-2xl" onClick={() => changeMonth(1)}>
               Next
