@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dumbbell, LogOut, Settings } from "lucide-react";
+import { Dumbbell, Plus, Settings, Trash2, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +11,10 @@ import { Switch } from "@/components/ui/switch";
 
 import { safeNum } from "@/lib/domain";
 
-export default function Header({ activeUser, upsertUser, resetAll, signOut }) {
+export default function Header({ state, activeUser, setActiveUser, addUser, deleteUser, upsertUser, resetAll }) {
   const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("trainee");
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -27,21 +29,31 @@ export default function Header({ activeUser, upsertUser, resetAll, signOut }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="rounded-2xl border bg-background px-3 py-2 text-sm">
-          {activeUser?.name || "Account"} • {activeUser?.role || "trainee"}
-        </div>
+        <Select value={state.activeUserId} onValueChange={setActiveUser}>
+          <SelectTrigger className="w-[220px] rounded-2xl">
+            <SelectValue placeholder="Select user" />
+          </SelectTrigger>
+          <SelectContent>
+            {state.users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.name} • {u.role}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button variant="secondary" className="rounded-2xl">
-              Settings
+              <Users className="mr-2 h-4 w-4" />
+              Users
             </Button>
           </DialogTrigger>
 
           <DialogContent className="rounded-2xl">
             <DialogHeader>
-              <DialogTitle>Profile & settings</DialogTitle>
-              <DialogDescription>Manage your account details and training preferences.</DialogDescription>
+              <DialogTitle>Users & settings</DialogTitle>
+              <DialogDescription>Local-only multi-user support with trainee/trainer roles.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
@@ -53,11 +65,7 @@ export default function Header({ activeUser, upsertUser, resetAll, signOut }) {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Name</Label>
-                      <Input
-                        className="rounded-2xl"
-                        value={activeUser.name}
-                        onChange={(e) => upsertUser({ id: activeUser.id, name: e.target.value })}
-                      />
+                      <Input className="rounded-2xl" value={activeUser.name} onChange={(e) => upsertUser({ id: activeUser.id, name: e.target.value })} />
                     </div>
 
                     <div className="space-y-2">
@@ -122,27 +130,69 @@ export default function Header({ activeUser, upsertUser, resetAll, signOut }) {
 
               <Card className="rounded-2xl">
                 <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Add user</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-[1fr_160px_auto] sm:items-end">
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <Input className="rounded-2xl" placeholder="e.g., Alex" value={name} onChange={(e) => setName(e.target.value)} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <Select value={role} onValueChange={setRole}>
+                      <SelectTrigger className="rounded-2xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="trainee">trainee</SelectItem>
+                        <SelectItem value="trainer">trainer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    className="rounded-2xl"
+                    onClick={() => {
+                      addUser({ name, role });
+                      setName("");
+                      setRole("trainee");
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl">
+                <CardHeader className="pb-2">
                   <CardTitle className="text-sm">Danger zone</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="destructive"
+                      className="rounded-2xl"
+                      onClick={() => deleteUser(activeUser.id)}
+                      disabled={state.users.length <= 1}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete active user
+                    </Button>
                     <Button variant="outline" className="rounded-2xl" onClick={resetAll}>
                       <Settings className="mr-2 h-4 w-4" />
                       Reset all data
                     </Button>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Resetting removes your workouts, metrics, plans, and notes from the backend.
+                    Deleting a user removes their workouts/metrics/plans/notes from this browser.
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <Button variant="outline" className="rounded-2xl" onClick={signOut}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign out
-              </Button>
+            <DialogFooter>
               <Button className="rounded-2xl" onClick={() => setOpen(false)}>
                 Done
               </Button>
