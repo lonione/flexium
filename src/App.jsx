@@ -36,33 +36,6 @@ export default function App() {
     };
   }, []);
 
-  if (!session) {
-    return <AuthScreen />;
-  }
-  if (status === "loading" || status === "idle") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
-        <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-sm">Loading your data…</div>
-      </div>
-    );
-  }
-  if (status === "error") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
-        <div className="max-w-md rounded-2xl border bg-background px-4 py-4 text-sm shadow-sm">
-          <div className="font-medium">We couldn’t load your data.</div>
-          <div className="mt-2 text-xs text-muted-foreground">{error || "Please check your Supabase policies and try again."}</div>
-          <button
-            className="mt-4 rounded-2xl border px-3 py-2 text-xs"
-            onClick={() => supabase.auth.signOut()}
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const stats = useMemo(() => {
     const totalWorkouts = workouts.length;
     const last = workouts[workouts.length - 1] || null;
@@ -91,6 +64,33 @@ export default function App() {
     for (const p of plans) m.set(p.date, (m.get(p.date) || 0) + 1);
     return m;
   }, [plans]);
+
+  if (!session) {
+    return <AuthScreen />;
+  }
+  if (status === "loading" || status === "idle") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
+        <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-sm">Loading your data…</div>
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
+        <div className="max-w-md rounded-2xl border bg-background px-4 py-4 text-sm shadow-sm">
+          <div className="font-medium">We couldn’t load your data.</div>
+          <div className="mt-2 text-xs text-muted-foreground">{error || "Please check your Supabase policies and try again."}</div>
+          <button
+            className="mt-4 rounded-2xl border px-3 py-2 text-xs"
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
