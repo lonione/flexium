@@ -1,8 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import AuthScreen from "@/components/AuthScreen";
 import Header from "@/components/Header";
 import OverviewPanel from "@/components/OverviewPanel";
 import QuickAdd from "@/components/QuickAdd";
@@ -15,9 +16,29 @@ import Notes from "@/components/Notes";
 
 import { useWorkoutStore } from "@/store/useWorkoutStore";
 import { monthKey, safeNum, todayISO, workoutSummary } from "@/lib/domain";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function App() {
+  const [session, setSession] = useState(null);
   const { state, activeUser, exercisesById, workouts, metrics, notes, plans, api } = useWorkoutStore();
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setSession(data.session || null);
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+    return () => {
+      mounted = false;
+      subscription?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  if (!session) {
+    return <AuthScreen />;
+  }
 
   const stats = useMemo(() => {
     const totalWorkouts = workouts.length;
@@ -52,13 +73,10 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
         <Header
-          state={state}
           activeUser={activeUser}
-          setActiveUser={api.setActiveUser}
-          addUser={api.addUser}
-          deleteUser={api.deleteUser}
           upsertUser={api.upsertUser}
           resetAll={api.resetAll}
+          signOut={() => supabase.auth.signOut()}
         />
 
         <div className="mt-6 grid gap-6 md:grid-cols-12">
