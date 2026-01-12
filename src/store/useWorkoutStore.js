@@ -66,39 +66,33 @@ function mapMetricToDb(entry, userId) {
   return { id: entry.id, user_id: userId, date: entry.date, weight: entry.weight, body_fat: entry.bodyFat };
 }
 
-async function ensureAuthUser() {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.error("Failed to read session", sessionError);
-  }
-  let user = sessionData?.session?.user || null;
-  if (!user) {
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error) throw error;
-    user = data.user;
-  }
-  return user;
-}
-
 export function useWorkoutStore() {
   const [state, setState] = useState(() => emptyState);
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    const load = async () => {
-      try {
-        const user = await ensureAuthUser();
-        if (!user) return;
 
-        const { data: userRow } = await supabase.from("users").select("*").eq("id", user.id).maybeSingle();
+    const loadForUser = async (user) => {
+      try {
+        if (!user) return;
+        setStatus("loading");
+        setError("");
+
+        const { data: userRow, error: userError } = await supabase.from("users").select("*").eq("id", user.id).maybeSingle();
+        if (userError) {
+          throw userError;
+        }
         let resolvedUser = mapUserFromDb(userRow);
 
         if (!resolvedUser) {
+          const displayName = user.email ? user.email.split("@")[0] : "You";
           const { data: createdUser, error: createError } = await supabase
             .from("users")
             .insert({
               id: user.id,
-              name: "You",
+              name: displayName || "You",
               role: "trainee",
               favorites: [],
               settings: DEFAULT_SETTINGS
@@ -106,15 +100,14 @@ export function useWorkoutStore() {
             .select()
             .single();
           if (createError) {
-            console.error("Failed to create user", createError);
-          } else {
-            resolvedUser = mapUserFromDb(createdUser);
+            throw createError;
           }
+          resolvedUser = mapUserFromDb(createdUser);
         }
 
         const { data: exercisesData, error: exercisesError } = await supabase.from("exercises").select("*");
         if (exercisesError) {
-          console.error("Failed to load exercises", exercisesError);
+          throw exercisesError;
         }
 
         let resolvedExercises = exercisesData || [];
@@ -125,10 +118,9 @@ export function useWorkoutStore() {
             .insert(seeded)
             .select();
           if (seedError) {
-            console.error("Failed to seed exercises", seedError);
-          } else {
-            resolvedExercises = insertedExercises || [];
+            throw seedError;
           }
+          resolvedExercises = insertedExercises || [];
         }
 
         const [workoutsRes, metricsRes, notesRes, plansRes] = await Promise.all([
@@ -138,10 +130,10 @@ export function useWorkoutStore() {
           supabase.from("plans").select("*").eq("user_id", user.id)
         ]);
 
-        if (workoutsRes.error) console.error("Failed to load workouts", workoutsRes.error);
-        if (metricsRes.error) console.error("Failed to load metrics", metricsRes.error);
-        if (notesRes.error) console.error("Failed to load notes", notesRes.error);
-        if (plansRes.error) console.error("Failed to load plans", plansRes.error);
+        if (workoutsRes.error) throw workoutsRes.error;
+        if (metricsRes.error) throw metricsRes.error;
+        if (notesRes.error) throw notesRes.error;
+        if (plansRes.error) throw plansRes.error;
 
         if (!active) return;
 
@@ -157,14 +149,41 @@ export function useWorkoutStore() {
           plansByUser: { [activeId]: plansRes.data || [] }
         };
         setState(ensureUserBuckets(nextState, activeId));
+        setStatus("ready");
       } catch (error) {
         console.error("Failed to initialize store", error);
+        setState(emptyState);
+        setStatus("error");
+        setError(error?.message || "Failed to load your data.");
       }
     };
 
-    load();
+    const initialize = async () => {
+      const { data: sessionData, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Failed to read session", error);
+      }
+      if (sessionData?.session?.user) {
+        await loadForUser(sessionData.session.user);
+      } else {
+        setStatus("idle");
+      }
+    };
+
+    initialize();
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      if (session?.user) {
+        loadForUser(session.user);
+      } else {
+        setState(emptyState);
+        setStatus("idle");
+        setError("");
+      }
+    });
     return () => {
       active = false;
+      subscription?.subscription?.unsubscribe();
     };
   }, []);
 
@@ -437,5 +456,5 @@ export function useWorkoutStore() {
     }
   };
 
-  return { state, activeUser, exercisesById, workouts, metrics, notes, plans, api };
+  return { state, activeUser, exercisesById, workouts, metrics, notes, plans, api, status, error };
 }
