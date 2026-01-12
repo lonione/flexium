@@ -1,4 +1,9 @@
-export const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+export const uid = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+};
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export function formatDate(iso) {

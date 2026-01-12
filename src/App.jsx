@@ -1,8 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import AuthScreen from "@/components/AuthScreen";
 import Header from "@/components/Header";
 import OverviewPanel from "@/components/OverviewPanel";
 import QuickAdd from "@/components/QuickAdd";
@@ -15,9 +16,25 @@ import Notes from "@/components/Notes";
 
 import { useWorkoutStore } from "@/store/useWorkoutStore";
 import { monthKey, safeNum, todayISO, workoutSummary } from "@/lib/domain";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function App() {
-  const { state, activeUser, exercisesById, workouts, metrics, notes, plans, api } = useWorkoutStore();
+  const [session, setSession] = useState(null);
+  const { state, activeUser, exercisesById, workouts, metrics, notes, plans, api, status, error } = useWorkoutStore();
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setSession(data.session || null);
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+    return () => {
+      mounted = false;
+      subscription?.subscription?.unsubscribe();
+    };
+  }, []);
 
   const stats = useMemo(() => {
     const totalWorkouts = workouts.length;
@@ -48,17 +65,41 @@ export default function App() {
     return m;
   }, [plans]);
 
+  if (!session) {
+    return <AuthScreen />;
+  }
+  if (status === "loading" || status === "idle") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
+        <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-sm">Loading your data…</div>
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
+        <div className="max-w-md rounded-2xl border bg-background px-4 py-4 text-sm shadow-sm">
+          <div className="font-medium">We couldn’t load your data.</div>
+          <div className="mt-2 text-xs text-muted-foreground">{error || "Please check your Supabase policies and try again."}</div>
+          <button
+            className="mt-4 rounded-2xl border px-3 py-2 text-xs"
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
         <Header
-          state={state}
           activeUser={activeUser}
-          setActiveUser={api.setActiveUser}
-          addUser={api.addUser}
-          deleteUser={api.deleteUser}
           upsertUser={api.upsertUser}
           resetAll={api.resetAll}
+          signOut={() => supabase.auth.signOut()}
         />
 
         <div className="mt-6 grid gap-6 md:grid-cols-12">
