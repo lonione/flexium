@@ -1,50 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
 import { deepClone, uid } from "@/lib/domain";
+import { supabase } from "@/lib/supabaseClient";
 
-const STORAGE_KEY = "flexium_v1";
-
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
+const DEFAULT_SETTINGS = { weightUnit: "kg", plateIncrement: 2.5, showRPE: false };
 
 const seedExercises = [
-  { id: uid(), name: "Bench Press", muscle: "Chest", equipment: "Barbell" },
-  { id: uid(), name: "Squat", muscle: "Legs", equipment: "Barbell" },
-  { id: uid(), name: "Deadlift", muscle: "Back", equipment: "Barbell" },
-  { id: uid(), name: "Overhead Press", muscle: "Shoulders", equipment: "Barbell" },
-  { id: uid(), name: "Pull Up", muscle: "Back", equipment: "Bodyweight" },
-  { id: uid(), name: "Dumbbell Row", muscle: "Back", equipment: "Dumbbell" },
-  { id: uid(), name: "Bicep Curl", muscle: "Arms", equipment: "Dumbbell" },
-  { id: uid(), name: "Tricep Pushdown", muscle: "Arms", equipment: "Cable" }
+  { name: "Bench Press", muscle: "Chest", equipment: "Barbell" },
+  { name: "Squat", muscle: "Legs", equipment: "Barbell" },
+  { name: "Deadlift", muscle: "Back", equipment: "Barbell" },
+  { name: "Overhead Press", muscle: "Shoulders", equipment: "Barbell" },
+  { name: "Pull Up", muscle: "Back", equipment: "Bodyweight" },
+  { name: "Dumbbell Row", muscle: "Back", equipment: "Dumbbell" },
+  { name: "Bicep Curl", muscle: "Arms", equipment: "Dumbbell" },
+  { name: "Tricep Pushdown", muscle: "Arms", equipment: "Cable" }
 ];
 
-const seedUser = {
-  id: uid(),
-  name: "You",
+const placeholderUser = {
+  id: "loading",
+  name: "Loading",
   role: "trainee",
   favorites: [],
-  settings: { weightUnit: "kg", plateIncrement: 2.5, showRPE: false }
+  settings: DEFAULT_SETTINGS
 };
 
-const defaultState = {
+const emptyState = {
   version: 1,
-  activeUserId: seedUser.id,
-  users: [seedUser],
-  exercises: seedExercises,
-  workoutsByUser: { [seedUser.id]: [] },
-  metricsByUser: { [seedUser.id]: [] },
-  notesByUser: { [seedUser.id]: [] },
-  plansByUser: { [seedUser.id]: [] }
+  activeUserId: placeholderUser.id,
+  users: [placeholderUser],
+  exercises: [],
+  workoutsByUser: { [placeholderUser.id]: [] },
+  metricsByUser: { [placeholderUser.id]: [] },
+  notesByUser: { [placeholderUser.id]: [] },
+  plansByUser: { [placeholderUser.id]: [] }
 };
 
 function getUser(state, userId) {
@@ -60,14 +47,125 @@ function ensureUserBuckets(state, userId) {
   return s;
 }
 
-export function useWorkoutStore() {
-  const [state, setState] = useState(() => loadState() || defaultState);
+function mapUserFromDb(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    favorites: Array.isArray(row.favorites) ? row.favorites : [],
+    settings: { ...DEFAULT_SETTINGS, ...(row.settings || {}) }
+  };
+}
 
-  useEffect(() => saveState(state), [state]);
+function mapMetricFromDb(row) {
+  return { id: row.id, date: row.date, weight: row.weight ?? 0, bodyFat: row.body_fat ?? 0 };
+}
+
+function mapMetricToDb(entry, userId) {
+  return { id: entry.id, user_id: userId, date: entry.date, weight: entry.weight, body_fat: entry.bodyFat };
+}
+
+async function ensureAuthUser() {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Failed to read session", sessionError);
+  }
+  let user = sessionData?.session?.user || null;
+  if (!user) {
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) throw error;
+    user = data.user;
+  }
+  return user;
+}
+
+export function useWorkoutStore() {
+  const [state, setState] = useState(() => emptyState);
 
   useEffect(() => {
-    setState((s) => ensureUserBuckets(s, s.activeUserId));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let active = true;
+    const load = async () => {
+      try {
+        const user = await ensureAuthUser();
+        if (!user) return;
+
+        const { data: userRow } = await supabase.from("users").select("*").eq("id", user.id).maybeSingle();
+        let resolvedUser = mapUserFromDb(userRow);
+
+        if (!resolvedUser) {
+          const { data: createdUser, error: createError } = await supabase
+            .from("users")
+            .insert({
+              id: user.id,
+              name: "You",
+              role: "trainee",
+              favorites: [],
+              settings: DEFAULT_SETTINGS
+            })
+            .select()
+            .single();
+          if (createError) {
+            console.error("Failed to create user", createError);
+          } else {
+            resolvedUser = mapUserFromDb(createdUser);
+          }
+        }
+
+        const { data: exercisesData, error: exercisesError } = await supabase.from("exercises").select("*");
+        if (exercisesError) {
+          console.error("Failed to load exercises", exercisesError);
+        }
+
+        let resolvedExercises = exercisesData || [];
+        if (!resolvedExercises?.length) {
+          const seeded = seedExercises.map((exercise) => ({ id: uid(), ...exercise }));
+          const { data: insertedExercises, error: seedError } = await supabase
+            .from("exercises")
+            .insert(seeded)
+            .select();
+          if (seedError) {
+            console.error("Failed to seed exercises", seedError);
+          } else {
+            resolvedExercises = insertedExercises || [];
+          }
+        }
+
+        const [workoutsRes, metricsRes, notesRes, plansRes] = await Promise.all([
+          supabase.from("workouts").select("*").eq("user_id", user.id),
+          supabase.from("metrics").select("*").eq("user_id", user.id),
+          supabase.from("notes").select("*").eq("user_id", user.id),
+          supabase.from("plans").select("*").eq("user_id", user.id)
+        ]);
+
+        if (workoutsRes.error) console.error("Failed to load workouts", workoutsRes.error);
+        if (metricsRes.error) console.error("Failed to load metrics", metricsRes.error);
+        if (notesRes.error) console.error("Failed to load notes", notesRes.error);
+        if (plansRes.error) console.error("Failed to load plans", plansRes.error);
+
+        if (!active) return;
+
+        const activeId = resolvedUser?.id || placeholderUser.id;
+        const nextState = {
+          version: 1,
+          activeUserId: activeId,
+          users: resolvedUser ? [resolvedUser] : [placeholderUser],
+          exercises: resolvedExercises || [],
+          workoutsByUser: { [activeId]: workoutsRes.data || [] },
+          metricsByUser: { [activeId]: (metricsRes.data || []).map(mapMetricFromDb) },
+          notesByUser: { [activeId]: notesRes.data || [] },
+          plansByUser: { [activeId]: plansRes.data || [] }
+        };
+        setState(ensureUserBuckets(nextState, activeId));
+      } catch (error) {
+        console.error("Failed to initialize store", error);
+      }
+    };
+
+    load();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const activeUser = useMemo(() => getUser(state, state.activeUserId) || state.users[0], [state]);
@@ -87,34 +185,54 @@ export function useWorkoutStore() {
     state,
     setActiveUser: (id) => setState((s) => ({ ...s, activeUserId: id })),
 
-    upsertUser: (userPatch) =>
+    upsertUser: async (userPatch) => {
+      const updates = { ...userPatch };
+      delete updates.id;
+      const { error } = await supabase.from("users").update(updates).eq("id", userPatch.id);
+      if (error) {
+        console.error("Failed to update user", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         const idx = next.users.findIndex((u) => u.id === userPatch.id);
         if (idx >= 0) next.users[idx] = { ...next.users[idx], ...userPatch };
         return next;
-      }),
+      });
+    },
 
-    addUser: ({ name, role }) =>
+    addUser: async ({ name, role }) => {
+      const newUser = {
+        id: uid(),
+        name: name.trim() || "New user",
+        role,
+        favorites: [],
+        settings: DEFAULT_SETTINGS
+      };
+      const { error } = await supabase.from("users").insert(newUser);
+      if (error) {
+        console.error("Failed to add user", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
-        const u = {
-          id: uid(),
-          name: name.trim() || "New user",
-          role,
-          favorites: [],
-          settings: { weightUnit: "kg", plateIncrement: 2.5, showRPE: false }
-        };
-        next.users.push(u);
-        next.activeUserId = u.id;
-        next.workoutsByUser[u.id] = [];
-        next.metricsByUser[u.id] = [];
-        next.notesByUser[u.id] = [];
-        next.plansByUser[u.id] = [];
+        next.users.push(newUser);
+        next.activeUserId = newUser.id;
+        next.workoutsByUser[newUser.id] = [];
+        next.metricsByUser[newUser.id] = [];
+        next.notesByUser[newUser.id] = [];
+        next.plansByUser[newUser.id] = [];
         return next;
-      }),
+      });
+    },
 
-    deleteUser: (userId) =>
+    deleteUser: async (userId) => {
+      if (state.users.length <= 1) return;
+      const { error } = await supabase.from("users").delete().eq("id", userId);
+      if (error) {
+        console.error("Failed to delete user", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         if (next.users.length <= 1) return next;
@@ -123,107 +241,199 @@ export function useWorkoutStore() {
         delete next.metricsByUser[userId];
         delete next.notesByUser[userId];
         delete next.plansByUser[userId];
-        if (next.activeUserId === userId) next.activeUserId = next.users[0].id;
+        if (next.activeUserId === userId) next.activeUserId = next.users[0]?.id || null;
         return next;
-      }),
+      });
+    },
 
-    addExercise: ({ name, muscle, equipment }) =>
+    addExercise: async ({ name, muscle, equipment }) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const exists = state.exercises.some((e) => e.name.toLowerCase() === trimmed.toLowerCase());
+      if (exists) return;
+      const exercise = {
+        id: uid(),
+        name: trimmed,
+        muscle: (muscle || "").trim(),
+        equipment: (equipment || "").trim()
+      };
+      const { error } = await supabase.from("exercises").insert(exercise);
+      if (error) {
+        console.error("Failed to add exercise", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
-        const trimmed = name.trim();
-        if (!trimmed) return next;
-        const exists = next.exercises.some((e) => e.name.toLowerCase() === trimmed.toLowerCase());
-        if (exists) return next;
-        next.exercises.unshift({
-          id: uid(),
-          name: trimmed,
-          muscle: (muscle || "").trim(),
-          equipment: (equipment || "").trim()
-        });
+        next.exercises.unshift(exercise);
         return next;
-      }),
+      });
+    },
 
-    addWorkout: (workout) =>
+    addWorkout: async (workout) => {
+      const record = { ...workout, user_id: state.activeUserId, exercises: workout.exercises || [] };
+      const { data, error } = await supabase.from("workouts").insert(record).select().single();
+      if (error) {
+        console.error("Failed to add workout", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         const list = next.workoutsByUser[next.activeUserId] || [];
-        list.push(workout);
+        list.push(data);
         list.sort((a, b) => a.date.localeCompare(b.date));
         next.workoutsByUser[next.activeUserId] = list;
         return next;
-      }),
+      });
+    },
 
-    updateWorkout: (updatedWorkout) =>
+    updateWorkout: async (updatedWorkout) => {
+      const record = { ...updatedWorkout, user_id: state.activeUserId, exercises: updatedWorkout.exercises || [] };
+      const { data, error } = await supabase.from("workouts").update(record).eq("id", updatedWorkout.id).select().single();
+      if (error) {
+        console.error("Failed to update workout", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         const list = next.workoutsByUser[next.activeUserId] || [];
         const idx = list.findIndex((w) => w.id === updatedWorkout.id);
-        if (idx >= 0) list[idx] = updatedWorkout;
+        if (idx >= 0) list[idx] = data;
         list.sort((a, b) => a.date.localeCompare(b.date));
         next.workoutsByUser[next.activeUserId] = list;
         return next;
-      }),
+      });
+    },
 
-    deleteWorkout: (workoutId) =>
+    deleteWorkout: async (workoutId) => {
+      const { error } = await supabase.from("workouts").delete().eq("id", workoutId);
+      if (error) {
+        console.error("Failed to delete workout", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         next.workoutsByUser[next.activeUserId] = (next.workoutsByUser[next.activeUserId] || []).filter(
           (w) => w.id !== workoutId
         );
         return next;
-      }),
+      });
+    },
 
-    addMetric: (entry) =>
+    addMetric: async (entry) => {
+      const { data, error } = await supabase
+        .from("metrics")
+        .insert(mapMetricToDb(entry, state.activeUserId))
+        .select()
+        .single();
+      if (error) {
+        console.error("Failed to add metric", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         const list = next.metricsByUser[next.activeUserId] || [];
-        const idx = list.findIndex((m) => m.date === entry.date);
-        if (idx >= 0) list[idx] = { ...list[idx], ...entry };
-        else list.push(entry);
+        const normalized = mapMetricFromDb(data);
+        const idx = list.findIndex((m) => m.date === normalized.date);
+        if (idx >= 0) list[idx] = { ...list[idx], ...normalized };
+        else list.push(normalized);
         list.sort((a, b) => a.date.localeCompare(b.date));
         next.metricsByUser[next.activeUserId] = list;
         return next;
-      }),
+      });
+    },
 
-    addNote: (note) =>
+    addNote: async (note) => {
+      const record = { ...note, user_id: state.activeUserId };
+      const { data, error } = await supabase.from("notes").insert(record).select().single();
+      if (error) {
+        console.error("Failed to add note", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         const list = next.notesByUser[next.activeUserId] || [];
-        list.unshift(note);
+        list.unshift(data);
         next.notesByUser[next.activeUserId] = list;
         return next;
-      }),
+      });
+    },
 
-    deleteNote: (noteId) =>
+    deleteNote: async (noteId) => {
+      const { error } = await supabase.from("notes").delete().eq("id", noteId);
+      if (error) {
+        console.error("Failed to delete note", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         next.notesByUser[next.activeUserId] = (next.notesByUser[next.activeUserId] || []).filter(
           (n) => n.id !== noteId
         );
         return next;
-      }),
+      });
+    },
 
-    addPlan: (plan) =>
+    addPlan: async (plan) => {
+      const record = { ...plan, user_id: state.activeUserId, items: plan.items || [] };
+      const { data, error } = await supabase.from("plans").insert(record).select().single();
+      if (error) {
+        console.error("Failed to add plan", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         const list = next.plansByUser[next.activeUserId] || [];
-        list.unshift(plan);
+        list.unshift(data);
         next.plansByUser[next.activeUserId] = list;
         return next;
-      }),
+      });
+    },
 
-    deletePlan: (planId) =>
+    deletePlan: async (planId) => {
+      const { error } = await supabase.from("plans").delete().eq("id", planId);
+      if (error) {
+        console.error("Failed to delete plan", error);
+        return;
+      }
       setState((s) => {
         const next = deepClone(s);
         next.plansByUser[next.activeUserId] = (next.plansByUser[next.activeUserId] || []).filter(
           (p) => p.id !== planId
         );
         return next;
-      }),
+      });
+    },
 
-    resetAll: () => {
-      localStorage.removeItem(STORAGE_KEY);
-      setState(defaultState);
+    resetAll: async () => {
+      const userId = state.activeUserId;
+      if (!userId) return;
+      const operations = [
+        supabase.from("workouts").delete().eq("user_id", userId),
+        supabase.from("metrics").delete().eq("user_id", userId),
+        supabase.from("notes").delete().eq("user_id", userId),
+        supabase.from("plans").delete().eq("user_id", userId),
+        supabase
+          .from("users")
+          .update({ name: "You", role: "trainee", favorites: [], settings: DEFAULT_SETTINGS })
+          .eq("id", userId)
+      ];
+      const results = await Promise.all(operations);
+      results.forEach((result) => {
+        if (result.error) {
+          console.error("Failed to reset data", result.error);
+        }
+      });
+      setState((s) => {
+        const next = deepClone(s);
+        next.users = next.users.map((u) =>
+          u.id === userId ? { ...u, name: "You", role: "trainee", favorites: [], settings: DEFAULT_SETTINGS } : u
+        );
+        next.workoutsByUser[userId] = [];
+        next.metricsByUser[userId] = [];
+        next.notesByUser[userId] = [];
+        next.plansByUser[userId] = [];
+        return next;
+      });
     }
   };
 
