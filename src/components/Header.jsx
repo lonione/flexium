@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dumbbell, Plus, Settings, Trash2, Users } from "lucide-react";
+import { Dumbbell, LogOut, Plus, Settings, Trash2, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 
 import { safeNum } from "@/lib/domain";
 
-export default function Header({ state, activeUser, setActiveUser, addUser, deleteUser, upsertUser, resetAll }) {
+export default function Header({ users, activeUserId, setActiveUser, addUser, deleteUser, activeUser, upsertUser, resetAll, signOut }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [role, setRole] = useState("trainee");
@@ -29,12 +29,12 @@ export default function Header({ state, activeUser, setActiveUser, addUser, dele
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={state.activeUserId} onValueChange={setActiveUser}>
+        <Select value={activeUserId} onValueChange={setActiveUser}>
           <SelectTrigger className="w-[220px] rounded-2xl">
             <SelectValue placeholder="Select user" />
           </SelectTrigger>
           <SelectContent>
-            {state.users.map((u) => (
+            {users.map((u) => (
               <SelectItem key={u.id} value={u.id}>
                 {u.name} • {u.role}
               </SelectItem>
@@ -52,8 +52,8 @@ export default function Header({ state, activeUser, setActiveUser, addUser, dele
 
           <DialogContent className="rounded-2xl">
             <DialogHeader>
-              <DialogTitle>Users & settings</DialogTitle>
-              <DialogDescription>Local-only multi-user support with trainee/trainer roles.</DialogDescription>
+              <DialogTitle>Profile & settings</DialogTitle>
+              <DialogDescription>Manage your account details and training preferences.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
@@ -65,7 +65,11 @@ export default function Header({ state, activeUser, setActiveUser, addUser, dele
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Name</Label>
-                      <Input className="rounded-2xl" value={activeUser.name} onChange={(e) => upsertUser({ id: activeUser.id, name: e.target.value })} />
+                      <Input
+                        className="rounded-2xl"
+                        value={activeUser.name}
+                        onChange={(e) => upsertUser({ id: activeUser.id, name: e.target.value })}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -175,7 +179,7 @@ export default function Header({ state, activeUser, setActiveUser, addUser, dele
                       variant="destructive"
                       className="rounded-2xl"
                       onClick={() => deleteUser(activeUser.id)}
-                      disabled={state.users.length <= 1}
+                      disabled={users.length <= 1}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete active user
@@ -186,13 +190,17 @@ export default function Header({ state, activeUser, setActiveUser, addUser, dele
                     </Button>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Deleting a user removes their workouts/metrics/plans/notes from this browser.
+                    Resetting removes your workouts, metrics, plans, and notes from the backend.
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <Button variant="outline" className="rounded-2xl" onClick={signOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </Button>
               <Button className="rounded-2xl" onClick={() => setOpen(false)}>
                 Done
               </Button>
