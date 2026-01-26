@@ -12,7 +12,7 @@ import EmptyState from "@/components/EmptyState";
 import WorkoutEditorDialog from "@/components/WorkoutEditorDialog";
 import { bestSetScore, formatDate, workoutSummary } from "@/lib/domain";
 
-export default function WorkoutHistoryEditable({ user, exercises, workouts, exercisesById, deleteWorkout, updateWorkout }) {
+export default function WorkoutHistoryEditable({ user, users, exercises, workouts, exercisesById, deleteWorkout, updateWorkout }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
 
@@ -21,7 +21,10 @@ export default function WorkoutHistoryEditable({ user, exercises, workouts, exer
     if (!query) return workouts;
     return workouts.filter((w) => {
       if ((w.name || "").toLowerCase().includes(query)) return true;
-      const names = (w.exercises || [])
+      const entries = Array.isArray(w.trainees)
+        ? (w.trainees || []).flatMap((t) => t.exercises || [])
+        : w.exercises || [];
+      const names = entries
         .map((e) => exercisesById[e.exerciseId]?.name || "")
         .join(" ")
         .toLowerCase();
@@ -85,36 +88,81 @@ export default function WorkoutHistoryEditable({ user, exercises, workouts, exer
                             </CardTitle>
                           </CardHeader>
 
-                          <CardContent className="space-y-2">
+                          <CardContent className="space-y-3">
                             <div className="text-sm text-muted-foreground">{sum.top || ""}</div>
-                            <div className="max-h-56 overflow-auto rounded-2xl border">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Exercise</TableHead>
-                                    <TableHead>Sets</TableHead>
-                                    <TableHead>Best set</TableHead>
-                                    <TableHead>Est. 1RM</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {(w.exercises || []).map((e) => {
-                                    const ex = exercisesById[e.exerciseId];
-                                    const best = bestSetScore(e.sets);
-                                    return (
-                                      <TableRow key={e.exerciseId}>
-                                        <TableCell className="font-medium">{ex?.name || "(Unknown)"}</TableCell>
-                                        <TableCell>{(e.sets || []).length}</TableCell>
-                                        <TableCell>
-                                          {best.weight} × {best.reps}
-                                        </TableCell>
-                                        <TableCell>{Math.round(best.oneRM)}</TableCell>
-                                      </TableRow>
-                                    );
-                                  })}
-                                </TableBody>
-                              </Table>
-                            </div>
+                            {Array.isArray(w.trainees) && w.trainees.length ? (
+                              <div className="space-y-3">
+                                {w.trainees.map((t) => {
+                                  const trainee = users.find((u) => u.id === t.traineeId);
+                                  return (
+                                    <Card key={t.traineeId} className="rounded-2xl">
+                                      <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm">{trainee?.name || "Trainee"}</CardTitle>
+                                      </CardHeader>
+                                      <CardContent className="space-y-2">
+                                        <div className="max-h-56 overflow-auto rounded-2xl border">
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow>
+                                                <TableHead>Exercise</TableHead>
+                                                <TableHead>Sets</TableHead>
+                                                <TableHead>Best set</TableHead>
+                                                <TableHead>Est. 1RM</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {(t.exercises || []).map((e) => {
+                                                const ex = exercisesById[e.exerciseId];
+                                                const best = bestSetScore(e.sets);
+                                                return (
+                                                  <TableRow key={e.exerciseId}>
+                                                    <TableCell className="font-medium">{ex?.name || "(Unknown)"}</TableCell>
+                                                    <TableCell>{(e.sets || []).length}</TableCell>
+                                                    <TableCell>
+                                                      {best.weight} × {best.reps}
+                                                    </TableCell>
+                                                    <TableCell>{Math.round(best.oneRM)}</TableCell>
+                                                  </TableRow>
+                                                );
+                                              })}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="max-h-56 overflow-auto rounded-2xl border">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Exercise</TableHead>
+                                      <TableHead>Sets</TableHead>
+                                      <TableHead>Best set</TableHead>
+                                      <TableHead>Est. 1RM</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {(w.exercises || []).map((e) => {
+                                      const ex = exercisesById[e.exerciseId];
+                                      const best = bestSetScore(e.sets);
+                                      return (
+                                        <TableRow key={e.exerciseId}>
+                                          <TableCell className="font-medium">{ex?.name || "(Unknown)"}</TableCell>
+                                          <TableCell>{(e.sets || []).length}</TableCell>
+                                          <TableCell>
+                                            {best.weight} × {best.reps}
+                                          </TableCell>
+                                          <TableCell>{Math.round(best.oneRM)}</TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       </motion.div>
@@ -135,6 +183,7 @@ export default function WorkoutHistoryEditable({ user, exercises, workouts, exer
         {editing ? (
           <WorkoutEditorDialog
             user={user}
+            users={users}
             exercises={exercises}
             exercisesById={exercisesById}
             initialWorkout={editing}

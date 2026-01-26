@@ -80,17 +80,23 @@ export function bestSetScore(sets) {
   return best;
 }
 
-export function lastPerformance(workouts, exerciseId) {
+export function lastPerformance(workouts, exerciseId, userId) {
   for (let i = workouts.length - 1; i >= 0; i--) {
     const w = workouts[i];
-    const ex = (w.exercises || []).find((e) => e.exerciseId === exerciseId);
-    if (ex) return { workout: w, entry: ex };
+    if (userId && Array.isArray(w.trainees)) {
+      const trainee = (w.trainees || []).find((t) => t.traineeId === userId);
+      const ex = (trainee?.exercises || []).find((e) => e.exerciseId === exerciseId);
+      if (ex) return { workout: w, entry: ex };
+    } else {
+      const ex = (w.exercises || []).find((e) => e.exerciseId === exerciseId);
+      if (ex) return { workout: w, entry: ex };
+    }
   }
   return null;
 }
 
 export function recommendNext(user, workouts, exerciseId) {
-  const perf = lastPerformance(workouts, exerciseId);
+  const perf = lastPerformance(workouts, exerciseId, user?.id);
   const rounding = clamp(Number(user?.settings?.plateIncrement) || 2.5, 0.25, 10);
 
   let targetSets = 3;
@@ -123,12 +129,15 @@ export function recommendNext(user, workouts, exerciseId) {
 }
 
 export function workoutSummary(workout, exercisesById) {
-  const exCount = (workout.exercises || []).length;
-  const volume = (workout.exercises || []).reduce((sum, e) => {
+  const entries = Array.isArray(workout.trainees)
+    ? (workout.trainees || []).flatMap((t) => t.exercises || [])
+    : workout.exercises || [];
+  const exCount = entries.length;
+  const volume = entries.reduce((sum, e) => {
     return sum + (e.sets || []).reduce((s2, set) => s2 + safeNum(set.weight) * safeNum(set.reps), 0);
   }, 0);
 
-  const top = (workout.exercises || [])
+  const top = entries
     .slice(0, 3)
     .map((e) => exercisesById[e.exerciseId]?.name || "(Unknown)")
     .join(" • ");

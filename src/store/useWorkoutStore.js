@@ -195,10 +195,10 @@ export function useWorkoutStore() {
     return m;
   }, [state.exercises]);
 
-  const workouts = state.workoutsByUser[state.activeUserId] || [];
+  const workouts = state.sharedWorkouts || [];
   const metrics = state.metricsByUser[state.activeUserId] || [];
   const notes = state.notesByUser[state.activeUserId] || [];
-  const plans = state.plansByUser[state.activeUserId] || [];
+  const plans = state.sharedPlans || [];
 
   const api = {
     state,
@@ -300,6 +300,7 @@ export function useWorkoutStore() {
         const list = next.workoutsByUser[next.activeUserId] || [];
         list.push(data);
         list.sort((a, b) => a.date.localeCompare(b.date));
+        next.sharedWorkouts = list;
         next.workoutsByUser[next.activeUserId] = list;
         return next;
       });
@@ -314,10 +315,11 @@ export function useWorkoutStore() {
       }
       setState((s) => {
         const next = deepClone(s);
-        const list = next.workoutsByUser[next.activeUserId] || [];
+        const list = next.sharedWorkouts || [];
         const idx = list.findIndex((w) => w.id === updatedWorkout.id);
         if (idx >= 0) list[idx] = data;
         list.sort((a, b) => a.date.localeCompare(b.date));
+        next.sharedWorkouts = list;
         next.workoutsByUser[next.activeUserId] = list;
         return next;
       });
@@ -331,9 +333,10 @@ export function useWorkoutStore() {
       }
       setState((s) => {
         const next = deepClone(s);
-        next.workoutsByUser[next.activeUserId] = (next.workoutsByUser[next.activeUserId] || []).filter(
+        next.sharedWorkouts = (next.sharedWorkouts || []).filter(
           (w) => w.id !== workoutId
         );
+        next.workoutsByUser[next.activeUserId] = next.sharedWorkouts;
         return next;
       });
     },
@@ -416,9 +419,10 @@ export function useWorkoutStore() {
       }
       setState((s) => {
         const next = deepClone(s);
-        next.plansByUser[next.activeUserId] = (next.plansByUser[next.activeUserId] || []).filter(
+        next.sharedPlans = (next.sharedPlans || []).filter(
           (p) => p.id !== planId
         );
+        next.plansByUser[next.activeUserId] = next.sharedPlans;
         return next;
       });
     },

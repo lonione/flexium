@@ -96,6 +96,11 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
         <Header
+          users={state.users}
+          activeUserId={state.activeUserId}
+          setActiveUser={api.setActiveUser}
+          addUser={api.addUser}
+          deleteUser={api.deleteUser}
           activeUser={activeUser}
           upsertUser={api.upsertUser}
           resetAll={api.resetAll}
@@ -123,36 +128,39 @@ export default function App() {
                 </TabsList>
 
                 <TabsContent value="log" className="mt-4">
-                  <WorkoutLogger
-                    user={activeUser}
-                    exercises={state.exercises}
-                    workouts={workouts}
-                    addWorkout={api.addWorkout}
-                    exercisesById={exercisesById}
-                  />
+          <WorkoutLogger
+            user={activeUser}
+            users={state.users}
+            exercises={state.exercises}
+            workouts={workouts}
+            addWorkout={api.addWorkout}
+            exercisesById={exercisesById}
+          />
                 </TabsContent>
 
                 <TabsContent value="history" className="mt-4">
-                  <WorkoutHistoryEditable
-                    user={activeUser}
-                    exercises={state.exercises}
-                    workouts={workouts}
-                    exercisesById={exercisesById}
-                    deleteWorkout={api.deleteWorkout}
-                    updateWorkout={api.updateWorkout}
-                  />
+          <WorkoutHistoryEditable
+            user={activeUser}
+            users={state.users}
+            exercises={state.exercises}
+            workouts={workouts}
+            exercisesById={exercisesById}
+            deleteWorkout={api.deleteWorkout}
+            updateWorkout={api.updateWorkout}
+          />
                 </TabsContent>
 
                 <TabsContent value="plan" className="mt-4">
-                  <Planner
-                    user={activeUser}
-                    exercises={state.exercises}
-                    workouts={workouts}
-                    plans={plans}
-                    exercisesById={exercisesById}
-                    addPlan={api.addPlan}
-                    deletePlan={api.deletePlan}
-                  />
+          <Planner
+            user={activeUser}
+            users={state.users}
+            exercises={state.exercises}
+            workouts={workouts}
+            plans={plans}
+            exercisesById={exercisesById}
+            addPlan={api.addPlan}
+            deletePlan={api.deletePlan}
+          />
                 </TabsContent>
 
                 <TabsContent value="exercises" className="mt-4">

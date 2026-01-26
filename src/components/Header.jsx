@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dumbbell, LogOut, Settings } from "lucide-react";
+import { Dumbbell, LogOut, Plus, Settings, Trash2, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 
 import { safeNum } from "@/lib/domain";
 
-export default function Header({ activeUser, upsertUser, resetAll, signOut }) {
+export default function Header({ users, activeUserId, setActiveUser, addUser, deleteUser, activeUser, upsertUser, resetAll, signOut }) {
   const [open, setOpen] = useState(false);
 
   return (
