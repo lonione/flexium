@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { deepClone, uid } from "@/lib/domain";
 import { supabase } from "@/lib/supabaseClient";
+//V3.1 - tuning users
 
 const DEFAULT_SETTINGS = { weightUnit: "kg", plateIncrement: 2.5, showRPE: false };
 
