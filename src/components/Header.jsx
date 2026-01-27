@@ -13,8 +13,6 @@ import { safeNum } from "@/lib/domain";
 
 export default function Header({ users, activeUserId, setActiveUser, addUser, deleteUser, activeUser, upsertUser, resetAll, signOut }) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [role, setRole] = useState("trainee");
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -29,24 +27,14 @@ export default function Header({ users, activeUserId, setActiveUser, addUser, de
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={activeUserId} onValueChange={setActiveUser}>
-          <SelectTrigger className="w-[220px] rounded-2xl">
-            <SelectValue placeholder="Select user" />
-          </SelectTrigger>
-          <SelectContent>
-            {users.map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.name} • {u.role}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="rounded-2xl border bg-background px-3 py-2 text-sm">
+          {activeUser?.name || "Account"} • {activeUser?.role || "trainee"}
+        </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button variant="secondary" className="rounded-2xl">
-              <Users className="mr-2 h-4 w-4" />
-              Users
+              Settings
             </Button>
           </DialogTrigger>
 
@@ -134,56 +122,10 @@ export default function Header({ users, activeUserId, setActiveUser, addUser, de
 
               <Card className="rounded-2xl">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Add user</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-3 sm:grid-cols-[1fr_160px_auto] sm:items-end">
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input className="rounded-2xl" placeholder="e.g., Alex" value={name} onChange={(e) => setName(e.target.value)} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Role</Label>
-                    <Select value={role} onValueChange={setRole}>
-                      <SelectTrigger className="rounded-2xl">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="trainee">trainee</SelectItem>
-                        <SelectItem value="trainer">trainer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Button
-                    className="rounded-2xl"
-                    onClick={() => {
-                      addUser({ name, role });
-                      setName("");
-                      setRole("trainee");
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl">
-                <CardHeader className="pb-2">
                   <CardTitle className="text-sm">Danger zone</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="destructive"
-                      className="rounded-2xl"
-                      onClick={() => deleteUser(activeUser.id)}
-                      disabled={users.length <= 1}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete active user
-                    </Button>
                     <Button variant="outline" className="rounded-2xl" onClick={resetAll}>
                       <Settings className="mr-2 h-4 w-4" />
                       Reset all data

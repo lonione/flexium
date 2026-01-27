@@ -28,11 +28,9 @@ const emptyState = {
   activeUserId: placeholderUser.id,
   users: [placeholderUser],
   exercises: [],
-  sharedWorkouts: [],
   workoutsByUser: { [placeholderUser.id]: [] },
   metricsByUser: { [placeholderUser.id]: [] },
   notesByUser: { [placeholderUser.id]: [] },
-  sharedPlans: [],
   plansByUser: { [placeholderUser.id]: [] }
 };
 
@@ -66,15 +64,6 @@ function mapMetricFromDb(row) {
 
 function mapMetricToDb(entry, userId) {
   return { id: entry.id, user_id: userId, date: entry.date, weight: entry.weight, body_fat: entry.bodyFat };
-}
-
-function normalizePlan(plan) {
-  if (!plan) return null;
-  return {
-    ...plan,
-    items: Array.isArray(plan.items) ? plan.items : [],
-    trainees: Array.isArray(plan.trainees) ? plan.trainees : []
-  };
 }
 
 export function useWorkoutStore() {
@@ -116,13 +105,6 @@ export function useWorkoutStore() {
           resolvedUser = mapUserFromDb(createdUser);
         }
 
-        const { data: usersData, error: usersError } = await supabase.from("users").select("*");
-        if (usersError) {
-          throw usersError;
-        }
-        const resolvedUsers = (usersData || []).map(mapUserFromDb);
-        const activeId = resolvedUser?.id || resolvedUsers[0]?.id || placeholderUser.id;
-
         const { data: exercisesData, error: exercisesError } = await supabase.from("exercises").select("*");
         if (exercisesError) {
           throw exercisesError;
@@ -142,10 +124,10 @@ export function useWorkoutStore() {
         }
 
         const [workoutsRes, metricsRes, notesRes, plansRes] = await Promise.all([
-          supabase.from("workouts").select("*"),
+          supabase.from("workouts").select("*").eq("user_id", user.id),
           supabase.from("metrics").select("*").eq("user_id", user.id),
           supabase.from("notes").select("*").eq("user_id", user.id),
-          supabase.from("plans").select("*")
+          supabase.from("plans").select("*").eq("user_id", user.id)
         ]);
 
         if (workoutsRes.error) throw workoutsRes.error;
@@ -155,18 +137,16 @@ export function useWorkoutStore() {
 
         if (!active) return;
 
-        const normalizedPlans = (plansRes.data || []).map(normalizePlan).filter(Boolean);
+        const activeId = resolvedUser?.id || placeholderUser.id;
         const nextState = {
           version: 1,
           activeUserId: activeId,
-          users: resolvedUsers.length ? resolvedUsers : [placeholderUser],
+          users: resolvedUser ? [resolvedUser] : [placeholderUser],
           exercises: resolvedExercises || [],
-          sharedWorkouts: workoutsRes.data || [],
           workoutsByUser: { [activeId]: workoutsRes.data || [] },
           metricsByUser: { [activeId]: (metricsRes.data || []).map(mapMetricFromDb) },
           notesByUser: { [activeId]: notesRes.data || [] },
-          sharedPlans: normalizedPlans,
-          plansByUser: { [activeId]: normalizedPlans }
+          plansByUser: { [activeId]: plansRes.data || [] }
         };
         setState(ensureUserBuckets(nextState, activeId));
         setStatus("ready");
@@ -309,7 +289,7 @@ export function useWorkoutStore() {
     },
 
     addWorkout: async (workout) => {
-      const record = { ...workout, user_id: state.activeUserId, exercises: workout.exercises || [], trainees: workout.trainees || [] };
+      const record = { ...workout, user_id: state.activeUserId, exercises: workout.exercises || [] };
       const { data, error } = await supabase.from("workouts").insert(record).select().single();
       if (error) {
         console.error("Failed to add workout", error);
@@ -317,7 +297,7 @@ export function useWorkoutStore() {
       }
       setState((s) => {
         const next = deepClone(s);
-        const list = next.sharedWorkouts || [];
+        const list = next.workoutsByUser[next.activeUserId] || [];
         list.push(data);
         list.sort((a, b) => a.date.localeCompare(b.date));
         next.sharedWorkouts = list;
@@ -327,7 +307,7 @@ export function useWorkoutStore() {
     },
 
     updateWorkout: async (updatedWorkout) => {
-      const record = { ...updatedWorkout, user_id: state.activeUserId, exercises: updatedWorkout.exercises || [], trainees: updatedWorkout.trainees || [] };
+      const record = { ...updatedWorkout, user_id: state.activeUserId, exercises: updatedWorkout.exercises || [] };
       const { data, error } = await supabase.from("workouts").update(record).eq("id", updatedWorkout.id).select().single();
       if (error) {
         console.error("Failed to update workout", error);
@@ -416,18 +396,16 @@ export function useWorkoutStore() {
     },
 
     addPlan: async (plan) => {
-      const record = { ...plan, user_id: state.activeUserId, items: plan.items || [], trainees: plan.trainees || [] };
+      const record = { ...plan, user_id: state.activeUserId, items: plan.items || [] };
       const { data, error } = await supabase.from("plans").insert(record).select().single();
       if (error) {
         console.error("Failed to add plan", error);
         return;
       }
-      const normalized = normalizePlan(data || record);
       setState((s) => {
         const next = deepClone(s);
-        const list = next.sharedPlans || [];
-        if (normalized) list.unshift(normalized);
-        next.sharedPlans = list;
+        const list = next.plansByUser[next.activeUserId] || [];
+        list.unshift(data);
         next.plansByUser[next.activeUserId] = list;
         return next;
       });
@@ -453,10 +431,10 @@ export function useWorkoutStore() {
       const userId = state.activeUserId;
       if (!userId) return;
       const operations = [
-        supabase.from("workouts").delete(),
+        supabase.from("workouts").delete().eq("user_id", userId),
         supabase.from("metrics").delete().eq("user_id", userId),
         supabase.from("notes").delete().eq("user_id", userId),
-        supabase.from("plans").delete(),
+        supabase.from("plans").delete().eq("user_id", userId),
         supabase
           .from("users")
           .update({ name: "You", role: "trainee", favorites: [], settings: DEFAULT_SETTINGS })
@@ -473,11 +451,9 @@ export function useWorkoutStore() {
         next.users = next.users.map((u) =>
           u.id === userId ? { ...u, name: "You", role: "trainee", favorites: [], settings: DEFAULT_SETTINGS } : u
         );
-        next.sharedWorkouts = [];
         next.workoutsByUser[userId] = [];
         next.metricsByUser[userId] = [];
         next.notesByUser[userId] = [];
-        next.sharedPlans = [];
         next.plansByUser[userId] = [];
         return next;
       });
