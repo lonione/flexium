@@ -198,7 +198,7 @@ export function useWorkoutStore() {
   const workouts = state.sharedWorkouts || [];
   const metrics = state.metricsByUser[state.activeUserId] || [];
   const notes = state.notesByUser[state.activeUserId] || [];
-  const plans = state.sharedPlans || [];
+  const plans = state.plansByUser[state.activeUserId] || [];
   console.log(plans);
   const api = {
     state,
