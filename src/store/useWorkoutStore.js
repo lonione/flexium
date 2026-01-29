@@ -424,10 +424,8 @@ export function useWorkoutStore() {
       }
       setState((s) => {
         const next = deepClone(s);
-        next.sharedPlans = (next.sharedPlans || []).filter(
-          (p) => p.id !== planId
-        );
-        next.plansByUser[next.activeUserId] = next.sharedPlans;
+        const list = next.plansByUser[next.activeUserId] || [];
+        next.plansByUser[next.activeUserId] = list.filter((p) => p.id !== planId);
         return next;
       });
     },

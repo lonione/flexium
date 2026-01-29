@@ -1,22 +1,25 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2, Wand2 } from "lucide-react";
+import { ClipboardCheck, Plus, Trash2, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import EmptyState from "@/components/EmptyState";
+import WorkoutEditorDialog from "@/components/WorkoutEditorDialog";
 import { recommendNext, safeNum, todayISO, uid } from "@/lib/domain";
 
-export default function Planner({ user, users, exercises, workouts, plans, exercisesById, addPlan, deletePlan }) {
+export default function Planner({ user, users, exercises, workouts, plans, exercisesById, addPlan, addWorkout, deletePlan }) {
   const [date, setDate] = useState(todayISO());
   const [name, setName] = useState("Next workout");
   const [query, setQuery] = useState("");
   const [traineeIds, setTraineeIds] = useState([]);
   const [itemsByTrainee, setItemsByTrainee] = useState({}); // {traineeId: [{exerciseId, targetSets, targetReps, targetWeight}]}
+  const [planToLog, setPlanToLog] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -70,6 +73,30 @@ export default function Planner({ user, users, exercises, workouts, plans, exerc
   };
 
   const canSave = traineeIds.some((id) => (itemsByTrainee[id] || []).length > 0);
+
+  const buildWorkoutFromPlan = (plan) => {
+    return {
+      id: uid(),
+      date: plan.date || todayISO(),
+      name: plan.name || "Workout",
+      trainees: (plan.trainees || []).map((t) => ({
+        traineeId: t.traineeId,
+        exercises: (t.items || []).map((it) => {
+          const setsCount = Math.max(1, safeNum(it.targetSets));
+          const reps = safeNum(it.targetReps);
+          const weight = safeNum(it.targetWeight);
+          return {
+            exerciseId: it.exerciseId,
+            sets: Array.from({ length: setsCount }, () => ({
+              reps,
+              weight,
+              rpe: user.settings.showRPE ? 0 : undefined
+            }))
+          };
+        })
+      }))
+    };
+  };
 
   return (
     <div className="grid gap-4">
@@ -273,9 +300,20 @@ export default function Planner({ user, users, exercises, workouts, plans, exerc
                             {p.date} • {(p.trainees || []).length} trainees
                           </div>
                         </div>
-                        <Button size="icon" variant="ghost" className="rounded-2xl" onClick={() => deletePlan(p.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="rounded-2xl"
+                            onClick={() => setPlanToLog({ planId: p.id, workout: buildWorkoutFromPlan(p) })}
+                          >
+                            <ClipboardCheck className="mr-2 h-4 w-4" />
+                            Log workout
+                          </Button>
+                          <Button size="icon" variant="ghost" className="rounded-2xl" onClick={() => deletePlan(p.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm text-muted-foreground">
@@ -291,6 +329,30 @@ export default function Planner({ user, users, exercises, workouts, plans, exerc
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!planToLog} onOpenChange={(open) => !open && setPlanToLog(null)}>
+        <DialogContent className="max-w-3xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Log planned workout</DialogTitle>
+            <DialogDescription>Adjust the plan before saving it as a logged workout. The plan will be removed once saved.</DialogDescription>
+          </DialogHeader>
+          {planToLog ? (
+            <WorkoutEditorDialog
+              user={user}
+              users={users}
+              exercises={exercises}
+              exercisesById={exercisesById}
+              initialWorkout={planToLog.workout}
+              onCancel={() => setPlanToLog(null)}
+              onSave={async (workout) => {
+                await addWorkout({ ...workout, id: uid() });
+                await deletePlan(planToLog.planId);
+                setPlanToLog(null);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

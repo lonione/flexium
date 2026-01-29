@@ -159,6 +159,7 @@ export default function App() {
             plans={plans}
             exercisesById={exercisesById}
             addPlan={api.addPlan}
+            addWorkout={api.addWorkout}
             deletePlan={api.deletePlan}
           />
                 </TabsContent>
