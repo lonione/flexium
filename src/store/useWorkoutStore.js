@@ -81,12 +81,12 @@ export function useWorkoutStore() {
         setStatus("loading");
         setError("");
 
-        const { data: userRow, error: userError } = await supabase.from("users").select("*").eq("id", user.id).maybeSingle();
+        /*const { data: userRow, error: userError } = await supabase.from("users").select("*").eq("id", user.id).maybeSingle();
         if (userError) {
           throw userError;
-        }
-        //const { data: allUsers, error: allUsersError } = await supabase.from("users").select("*");
-        //if (allUsersError) throw allUsersError;
+        }*/
+        const { data: allUsers, error: allUsersError } = await supabase.from("users").select("*");
+        if (allUsersError) throw allUsersError;
 
         let resolvedUser = mapUserFromDb(userRow);
 
@@ -145,8 +145,8 @@ export function useWorkoutStore() {
         const nextState = {
           version: 1,
           activeUserId: activeId,
-          users: resolvedUser ? [resolvedUser] : [placeholderUser],
-          //users: (allUsers || []).map(mapUserFromDb),
+          //users: resolvedUser ? [resolvedUser] : [placeholderUser],
+          users: (allUsers || []).map(mapUserFromDb),
           exercises: resolvedExercises || [],
           workoutsByUser: { [activeId]: workoutsRes.data || [] },
           metricsByUser: { [activeId]: (metricsRes.data || []).map(mapMetricFromDb) },
