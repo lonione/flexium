@@ -85,10 +85,11 @@ export function useWorkoutStore() {
         if (userError) {
           throw userError;
         }*/
-        const { data: userRow, error: allUsersError } = await supabase.from("users").select("*");
+        const { data: userRows, error: allUsersError } = await supabase.from("users").select("*");
         if (allUsersError) throw allUsersError;
 
-        let resolvedUser = mapUserFromDb(userRow);
+        let resolvedUser = mapUserFromDb(userRows?.find((row) => row.id === user.id));
+        //let resolvedUser = mapUserFromDb(userRow);
 
         if (!resolvedUser) {
           const displayName = user.email ? user.email.split("@")[0] : "You";
@@ -146,7 +147,7 @@ export function useWorkoutStore() {
           version: 1,
           activeUserId: activeId,
           //users: resolvedUser ? [resolvedUser] : [placeholderUser],
-          users: (userRow || []).map(mapUserFromDb),
+          users: (userRows || []).map(mapUserFromDb),
           exercises: resolvedExercises || [],
           workoutsByUser: { [activeId]: workoutsRes.data || [] },
           metricsByUser: { [activeId]: (metricsRes.data || []).map(mapMetricFromDb) },
