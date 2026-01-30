@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus, Search, Star } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,8 +11,8 @@ import EmptyState from "@/components/EmptyState";
 export default function ExerciseLibrary({ user, exercises, addExercise, toggleFavorite }) {
   const [q, setQ] = useState("");
   const [name, setName] = useState("");
-  const [muscle, setMuscle] = useState("");
   const [equipment, setEquipment] = useState("");
+  const [gifUrl, setGifUrl] = useState("");
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -43,22 +42,27 @@ export default function ExerciseLibrary({ user, exercises, addExercise, toggleFa
             <Input className="rounded-2xl" placeholder="e.g., Incline DB Press" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Muscle</Label>
-            <Input className="rounded-2xl" placeholder="e.g., Chest" value={muscle} onChange={(e) => setMuscle(e.target.value)} />
-          </div>
-          <div className="space-y-2">
             <Label>Equipment</Label>
             <Input className="rounded-2xl" placeholder="e.g., Dumbbell" value={equipment} onChange={(e) => setEquipment(e.target.value)} />
+          </div>
+          <div className="space-y-2 sm:col-span-3">
+            <Label>Exercise GIF URL</Label>
+            <Input
+              className="rounded-2xl"
+              placeholder="https://example.com/exercise.gif"
+              value={gifUrl}
+              onChange={(e) => setGifUrl(e.target.value)}
+            />
           </div>
 
           <div className="sm:col-span-3 flex justify-end">
             <Button
               className="rounded-2xl"
               onClick={() => {
-                addExercise({ name, muscle, equipment });
+                addExercise({ name, equipment, gifUrl });
                 setName("");
-                setMuscle("");
                 setEquipment("");
+                setGifUrl("");
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -84,11 +88,19 @@ export default function ExerciseLibrary({ user, exercises, addExercise, toggleFa
                     <div>
                       <div className="font-medium">{e.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {e.muscle || ""}{e.equipment ? ` • ${e.equipment}` : ""}
+                        {e.equipment ? `${e.equipment}` : "No equipment listed"}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {e.muscle ? <Badge variant="secondary">{e.muscle}</Badge> : null}
-                        {e.equipment ? <Badge variant="secondary">{e.equipment}</Badge> : null}
+                        {e.gifUrl ? (
+                          <a
+                            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                            href={e.gifUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View GIF
+                          </a>
+                        ) : null}
                       </div>
                     </div>
                     <Button
