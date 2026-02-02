@@ -6,14 +6,14 @@ import { supabase } from "@/lib/supabaseClient";
 const DEFAULT_SETTINGS = { weightUnit: "kg", plateIncrement: 2.5, showRPE: false };
 
 const seedExercises = [
-  { name: "Bench Press", muscle: "Chest", equipment: "Barbell" },
-  { name: "Squat", muscle: "Legs", equipment: "Barbell" },
-  { name: "Deadlift", muscle: "Back", equipment: "Barbell" },
-  { name: "Overhead Press", muscle: "Shoulders", equipment: "Barbell" },
-  { name: "Pull Up", muscle: "Back", equipment: "Bodyweight" },
-  { name: "Dumbbell Row", muscle: "Back", equipment: "Dumbbell" },
-  { name: "Bicep Curl", muscle: "Arms", equipment: "Dumbbell" },
-  { name: "Tricep Pushdown", muscle: "Arms", equipment: "Cable" }
+  { name: "Bench Press", equipment: "Barbell", gifUrl: "" },
+  { name: "Squat", equipment: "Barbell", gifUrl: "" },
+  { name: "Deadlift", equipment: "Barbell", gifUrl: "" },
+  { name: "Overhead Press", equipment: "Barbell", gifUrl: "" },
+  { name: "Pull Up", equipment: "Bodyweight", gifUrl: "" },
+  { name: "Dumbbell Row", equipment: "Dumbbell", gifUrl: "" },
+  { name: "Bicep Curl", equipment: "Dumbbell", gifUrl: "" },
+  { name: "Tricep Pushdown", equipment: "Cable", gifUrl: "" }
 ];
 
 const placeholderUser = {
@@ -271,7 +271,7 @@ export function useWorkoutStore() {
       });
     },
 
-    addExercise: async ({ name, muscle, equipment }) => {
+    addExercise: async ({ name, equipment, gifUrl }) => {
       const trimmed = name.trim();
       if (!trimmed) return;
       const exists = state.exercises.some((e) => e.name.toLowerCase() === trimmed.toLowerCase());
@@ -279,8 +279,8 @@ export function useWorkoutStore() {
       const exercise = {
         id: uid(),
         name: trimmed,
-        muscle: (muscle || "").trim(),
-        equipment: (equipment || "").trim()
+        equipment: (equipment || "").trim(),
+        gifUrl: (gifUrl || "").trim()
       };
       const { error } = await supabase.from("exercises").insert(exercise);
       if (error) {
@@ -290,6 +290,30 @@ export function useWorkoutStore() {
       setState((s) => {
         const next = deepClone(s);
         next.exercises.unshift(exercise);
+        return next;
+      });
+    },
+    updateExercise: async ({ id, name, equipment, gifUrl }) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const exists = state.exercises.some(
+        (e) => e.id !== id && e.name.toLowerCase() === trimmed.toLowerCase()
+      );
+      if (exists) return;
+      const updates = {
+        name: trimmed,
+        equipment: (equipment || "").trim(),
+        gifUrl: (gifUrl || "").trim()
+      };
+      const { error } = await supabase.from("exercises").update(updates).eq("id", id);
+      if (error) {
+        console.error("Failed to update exercise", error);
+        return;
+      }
+      setState((s) => {
+        const next = deepClone(s);
+        const idx = next.exercises.findIndex((e) => e.id === id);
+        if (idx >= 0) next.exercises[idx] = { ...next.exercises[idx], ...updates };
         return next;
       });
     },

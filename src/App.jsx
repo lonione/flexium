@@ -169,6 +169,7 @@ export default function App() {
                     user={activeUser}
                     exercises={state.exercises}
                     addExercise={api.addExercise}
+                    updateExercise={api.updateExercise}
                     toggleFavorite={(exerciseId) => {
                       const fav = new Set(activeUser.favorites || []);
                       fav.has(exerciseId) ? fav.delete(exerciseId) : fav.add(exerciseId);

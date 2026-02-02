@@ -189,7 +189,7 @@ export default function Planner({ user, users, exercises, workouts, plans, exerc
                                 <div>
                                   <div className="font-medium">{e.name}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {e.muscle || ""}{e.equipment ? ` • ${e.equipment}` : ""}
+                                    {e.equipment || "No equipment listed"}
                                   </div>
                                 </div>
                                 {isIn ? <Badge>Added</Badge> : <Badge variant="secondary">Add</Badge>}
