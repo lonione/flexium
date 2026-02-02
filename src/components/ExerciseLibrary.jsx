@@ -81,12 +81,10 @@ export default function ExerciseLibrary({ user, exercises, addExercise, updateEx
             <Button
               className="rounded-2xl"
               onClick={() => {
-                if (isEditing) {
-                  updateExercise({ id: editingId, name, equipment, gifUrl });
-                } else {
-                  addExercise({ name, equipment, gifUrl });
-                }
-                resetForm();
+                addExercise({ name, equipment, gifUrl });
+                setName("");
+                setEquipment("");
+                setGifUrl("");
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
