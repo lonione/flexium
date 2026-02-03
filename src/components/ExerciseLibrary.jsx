@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Search, Star } from "lucide-react";
+import { Pencil, Plus, Search, Star, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 
 import EmptyState from "@/components/EmptyState";
 
-export default function ExerciseLibrary({ user, exercises, addExercise, toggleFavorite }) {
+export default function ExerciseLibrary({ user, exercises, addExercise, updateExercise, toggleFavorite }) {
   const [q, setQ] = useState("");
   const [name, setName] = useState("");
   const [equipment, setEquipment] = useState("");
   const [gifUrl, setGifUrl] = useState("");
+  const [editingId, setEditingId] = useState(null);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -21,12 +22,27 @@ export default function ExerciseLibrary({ user, exercises, addExercise, toggleFa
   }, [q, exercises]);
 
   const fav = new Set(user.favorites || []);
+  const isEditing = Boolean(editingId);
+
+  const startEdit = (exercise) => {
+    setEditingId(exercise.id);
+    setName(exercise.name || "");
+    setEquipment(exercise.equipment || "");
+    setGifUrl(exercise.gifUrl || "");
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setName("");
+    setEquipment("");
+    setGifUrl("");
+  };
 
   return (
     <div className="grid gap-4">
       <Card className="rounded-2xl shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Exercises</CardTitle>
+          <CardTitle className="text-base">{isEditing ? "Edit exercise" : "Exercises"}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-3 sm:items-end">
           <div className="space-y-2 sm:col-span-3">
@@ -38,7 +54,7 @@ export default function ExerciseLibrary({ user, exercises, addExercise, toggleFa
           </div>
 
           <div className="space-y-2">
-            <Label>New exercise</Label>
+            <Label>{isEditing ? "Exercise name" : "New exercise"}</Label>
             <Input className="rounded-2xl" placeholder="e.g., Incline DB Press" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
@@ -55,7 +71,13 @@ export default function ExerciseLibrary({ user, exercises, addExercise, toggleFa
             />
           </div>
 
-          <div className="sm:col-span-3 flex justify-end">
+          <div className="sm:col-span-3 flex flex-wrap items-center justify-end gap-2">
+            {isEditing ? (
+              <Button variant="secondary" className="rounded-2xl" onClick={resetForm}>
+                <X className="mr-2 h-4 w-4" />
+                Cancel edit
+              </Button>
+            ) : null}
             <Button
               className="rounded-2xl"
               onClick={() => {
@@ -66,7 +88,7 @@ export default function ExerciseLibrary({ user, exercises, addExercise, toggleFa
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add exercise
+              {isEditing ? "Save changes" : "Add exercise"}
             </Button>
           </div>
         </CardContent>
@@ -103,15 +125,26 @@ export default function ExerciseLibrary({ user, exercises, addExercise, toggleFa
                         ) : null}
                       </div>
                     </div>
-                    <Button
-                      size="icon"
-                      variant={isFav ? "default" : "secondary"}
-                      className="rounded-2xl"
-                      onClick={() => toggleFavorite(e.id)}
-                      title={isFav ? "Unfavorite" : "Favorite"}
-                    >
-                      <Star className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="rounded-2xl"
+                        onClick={() => startEdit(e)}
+                        title="Edit exercise"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant={isFav ? "default" : "secondary"}
+                        className="rounded-2xl"
+                        onClick={() => toggleFavorite(e.id)}
+                        title={isFav ? "Unfavorite" : "Favorite"}
+                      >
+                        <Star className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}

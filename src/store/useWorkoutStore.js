@@ -293,6 +293,30 @@ export function useWorkoutStore() {
         return next;
       });
     },
+    updateExercise: async ({ id, name, equipment, gifUrl }) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const exists = state.exercises.some(
+        (e) => e.id !== id && e.name.toLowerCase() === trimmed.toLowerCase()
+      );
+      if (exists) return;
+      const updates = {
+        name: trimmed,
+        equipment: (equipment || "").trim(),
+        gifUrl: (gifUrl || "").trim()
+      };
+      const { error } = await supabase.from("exercises").update(updates).eq("id", id);
+      if (error) {
+        console.error("Failed to update exercise", error);
+        return;
+      }
+      setState((s) => {
+        const next = deepClone(s);
+        const idx = next.exercises.findIndex((e) => e.id === id);
+        if (idx >= 0) next.exercises[idx] = { ...next.exercises[idx], ...updates };
+        return next;
+      });
+    },
 
     addWorkout: async (workout) => {
       const record = { ...workout, user_id: state.activeUserId, exercises: workout.exercises || [] };
